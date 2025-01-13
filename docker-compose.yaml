@@ -1,0 +1,24 @@
+services:
+  data_cleaning:
+    build:
+      context: ./data_cleaning
+    volumes:
+      - ./data_cleaning:/app
+      - shared_data:/shared_data
+    command: python DataCleaningSetUp.py
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - 8000:8000
+    volumes:
+      - ./backend:/app
+      - shared_data:/shared_data
+    depends_on:
+      - data_cleaning
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+
+volumes:
+  shared_data:

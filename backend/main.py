@@ -2,8 +2,8 @@ from fastapi import FastAPI, HTTPException, Query
 from typing import Dict, List, Optional
 import logging
 from datetime import datetime
-from backend.database import query_to_df
-from backend.models import CategoryStats
+from database import query_to_df
+from models import CategoryStats
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

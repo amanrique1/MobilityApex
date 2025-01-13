@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database configuration
-DATABASE_PATH = "data.db"  # Update this with your actual database path
+DATABASE_PATH = "/shared_data/data.db"  # Update this with your actual database path
 
 @contextmanager
 def get_connection():

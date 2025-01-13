@@ -41,7 +41,7 @@ df_category_revenue = df.groupby("category")['total_sales'].sum()
 # Group by category and day_of_week, sum the total_sales (reset index used to keep the columns)
 category_day = df.groupby(['category', 'day_of_week'])['total_sales'].sum().reset_index()
 # Get the index of the max value for each category
-idx = category_day.groupby('category')['total_sales'].transform(max) == category_day['total_sales']
+idx = category_day.groupby('category')['total_sales'].transform('max') == category_day['total_sales']
 # Filter the dataframe with the idx
 df_category_day = category_day[idx]
 
@@ -60,7 +60,7 @@ df = df[~df['outlier']].drop(columns=['mean', 'std', 'outlier'])
 # # Export data
 
 # SQLite database file
-db_file = "data.db"
+db_file = "/shared_data/data.db"
 
 # Connect to the database (creates the file if it doesn't exist)
 conn = sqlite3.connect(db_file)
