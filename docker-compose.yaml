@@ -10,14 +10,30 @@ services:
   backend:
     build:
       context: ./backend
-    ports:
-      - 8000:8000
     volumes:
       - ./backend:/app
       - shared_data:/shared_data
     depends_on:
       - data_cleaning
     command: uvicorn main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      start_period: 10s       # Wait 10 seconds before the first health check
+      interval: 60s          # Check every 60 seconds after that
+      retries: 5             # Retry 5 times if health check fails
+      timeout: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - 8050:8050
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: python app.py
 
 
 volumes:

@@ -25,13 +25,23 @@ def validate_date_format(date_str: Optional[str]) -> None:
                 detail="Invalid date format. Please use 'YYYY-MM-DD'"
             )
 
+@app.get("/sales/filter_values", response_model=Dict)
+async def get_filter_values() -> List[Dict]:
+    """Retrieves unique product and category values for filtering."""
+    df_categories = query_to_df("SELECT DISTINCT category FROM sales")
+    df_products = query_to_df("SELECT DISTINCT product FROM sales")
+    return {
+        "categories": df_categories["category"].tolist(),
+        "products": df_products["product"].tolist()
+    }
+
 @app.get("/sales/product", response_model=List[Dict])
 async def get_products(
     product: Optional[str] = Query(None, description="Product name to filter by"),
     category: Optional[str] = Query(None, description="Category name to filter by")
 ) -> List[Dict]:
     """Retrieves product sales data with optional filtering."""
-    base_query = "SELECT * FROM sales"
+    base_query = "SELECT sum(total_sales) as total_sales, product FROM sales"
     params = {}
 
     if product and category:
@@ -45,6 +55,7 @@ async def get_products(
         base_query += " WHERE category = :category"
         params["category"] = category
 
+    base_query += " GROUP BY product"
     df = query_to_df(base_query, params)
     return df.to_dict(orient="records")
 
@@ -57,7 +68,7 @@ async def get_daily_sales(
     validate_date_format(start_date)
     validate_date_format(end_date)
 
-    base_query = "SELECT * FROM sales"
+    base_query = "SELECT sum(total_sales) as total_sales, date FROM sales"
     params = {}
 
     if start_date and end_date:
@@ -71,6 +82,7 @@ async def get_daily_sales(
         base_query += " WHERE date <= :end_date"
         params["end_date"] = end_date
 
+    base_query += " GROUP BY date"
     df = query_to_df(base_query, params)
     return df.to_dict(orient="records")
 
@@ -98,3 +110,8 @@ async def startup_event():
 async def shutdown_event():
     """Run cleanup tasks."""
     logger.info("Shutting down Sales Analytics API")
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

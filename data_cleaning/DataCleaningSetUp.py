@@ -32,14 +32,14 @@ df['high_volume'] = df['quantity'] > 10
 
 # # Transformations
 # Get the category mean
-df_category_mean = df.groupby("category")['price'].mean()
+df_category_mean = df.groupby(["category","product"])['price'].mean()
 
 # Get the category revenue
 df_category_revenue = df.groupby("category")['total_sales'].sum()
 
 # Get the day with highest sales for each category
 # Group by category and day_of_week, sum the total_sales (reset index used to keep the columns)
-category_day = df.groupby(['category', 'day_of_week'])['total_sales'].sum().reset_index()
+category_day = df.groupby(['category', 'date'])['total_sales'].sum().reset_index()
 # Get the index of the max value for each category
 idx = category_day.groupby('category')['total_sales'].transform('max') == category_day['total_sales']
 # Filter the dataframe with the idx
