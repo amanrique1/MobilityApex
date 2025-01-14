@@ -1,78 +1,74 @@
 import sqlite3
 import pandas as pd
 
-# Read the data from the file
-df = pd.read_csv('data.csv')
+def clean_data(df):
+    # Basic Cleaning
+    df['price'] = pd.to_numeric(df['price'], errors='coerce')
+    df = df.dropna(subset=['quantity', 'price'], how='all')
+    df['quantity'] = df['quantity'].fillna(0)
 
-# # Basic Cleaning
-# Convert 'Price' to numeric, setting errors='coerce' turns invalid values into NaN
-df['price'] = pd.to_numeric(df['price'], errors='coerce')
+    medians = df.groupby("category")['price'].median()
+    df['price'] = df['price'].fillna(medians).fillna(0)
 
-# Drop columns with NaN in price and quantity
-df = df.dropna(subset=['quantity', 'price'], how = 'all')
+    df['total_sales'] = df['quantity'] * df['price']
+    df['date'] = pd.to_datetime(df['date'])
+    df['day_of_week'] = df['date'].dt.day_name()
+    df['high_volume'] = df['quantity'] > 10
 
-# Fill missing values in quantity with 0
-df['quantity'] = df['quantity'].fillna(0)
+    return df
 
-# Calculate the median price for each category
-medians = df.groupby("category")['price'].median()
-# Fill missing values in 'price' with the median of the category
-df['price'] = df['price'].fillna(medians)
+def calculate_category_mean(df):
+    """Calculate mean price for each category-product combination."""
+    return df.groupby(["category", "product"])['price'].mean()
 
-# Get the total sales by multiplying quantity and price
-df['total_sales'] = df['quantity'] * df['price']
+def calculate_category_revenue(df):
+    """Calculate total revenue for each category."""
+    return df.groupby("category")['total_sales'].sum()
 
-# Get week day
-df['date'] = pd.to_datetime(df['date'])
-df['day_of_week'] = df['date'].dt.day_name()
+def calculate_category_day(df):
+    """Identify the day with the highest sales for each category."""
+    category_day = df.groupby(['category', 'date'])['total_sales'].sum().reset_index()
+    idx = category_day.groupby('category')['total_sales'].transform('max') == category_day['total_sales']
+    return category_day[idx]
 
-# Set high volume flag
-df['high_volume'] = df['quantity'] > 10
+def process_outliers(df):
+    """Detect transactions where quantity is more than 2 standard deviations from the category mean."""
+    stats = df.groupby("category")['quantity'].agg(['mean', 'std']).reset_index()
+    df = df.merge(stats, on="category")
+    df['outlier'] = ((df['quantity'] < df['mean'] - 2 * df['std']) |
+                     (df['quantity'] > df['mean'] + 2 * df['std']))
+    df_outliers = df[df['outlier']].drop(columns=['mean', 'std', 'outlier'])
+    df_cleaned = df[~df['outlier']].drop(columns=['mean', 'std', 'outlier'])
+    return df_cleaned, df_outliers
 
+def create_database(df, df_outliers, df_category_day, df_category_mean, df_category_revenue, db_file):
+    conn = sqlite3.connect(db_file)
+    try:
+        df.to_sql('sales', conn, if_exists='replace', index=False)
+        df_outliers.to_sql('outliers', conn, if_exists='replace', index=False)
+        df_category_day.to_sql('category_day', conn, if_exists='replace', index=False)
+        df_category_mean.to_sql('category_mean', conn, if_exists='replace')
+        df_category_revenue.to_sql('category_revenue', conn, if_exists='replace')
+    finally:
+        conn.close()
 
-# # Transformations
-# Get the category mean
-df_category_mean = df.groupby(["category","product"])['price'].mean()
+def main():
+    # Read data from CSV (you can replace 'data.csv' with the actual file path)
+    df = pd.read_csv('data.csv')
 
-# Get the category revenue
-df_category_revenue = df.groupby("category")['total_sales'].sum()
+    # Clean and process data
+    df = clean_data(df)
+    df_category_mean = calculate_category_mean(df)
+    df_category_revenue = calculate_category_revenue(df)
+    df_category_day = calculate_category_day(df)
+    df_cleaned, df_outliers = process_outliers(df)
 
-# Get the day with highest sales for each category
-# Group by category and day_of_week, sum the total_sales (reset index used to keep the columns)
-category_day = df.groupby(['category', 'date'])['total_sales'].sum().reset_index()
-# Get the index of the max value for each category
-idx = category_day.groupby('category')['total_sales'].transform('max') == category_day['total_sales']
-# Filter the dataframe with the idx
-df_category_day = category_day[idx]
+    # Set database file path (you can replace it with a custom path)
+    db_file = 'data.db'
 
-# Filter outliers (2+ standard deviations from category mean)
-# Calculate the mean and standard deviation for each category
-stats = df.groupby("category")['quantity'].agg(['mean', 'std']).reset_index()
-# Merge stats back into the original DataFrame
-df = df.merge(stats, on="category")
-# Tag outliers
-df['outlier'] = ((df['quantity'] < df['mean'] - 2 * df['std']) |
-                    (df['quantity'] > df['mean'] + 2 * df['std']))
-# Filter outliers and clean up the DataFrame
-df_outliers = df[df['outlier']].drop(columns=['mean', 'std', 'outlier'])
-df = df[~df['outlier']].drop(columns=['mean', 'std', 'outlier'])
+    # Create SQLite database and save tables
+    create_database(df_cleaned, df_outliers, df_category_day, df_category_mean, df_category_revenue, db_file)
+    print("Data processing complete and database created successfully.")
 
-# # Export data
-
-# SQLite database file
-db_file = "/shared_data/data.db"
-
-# Connect to the database (creates the file if it doesn't exist)
-conn = sqlite3.connect(db_file)
-
-try:
-    # Save dataframes as separate tables
-    df.to_sql('sales', conn, if_exists='replace', index=False)
-    df_outliers.to_sql('outliers', conn, if_exists='replace', index=False)
-    df_category_day.to_sql('category_day', conn, if_exists='replace', index=False)
-    df_category_mean.to_sql('category_mean', conn, if_exists='replace')
-    df_category_revenue.to_sql('category_revenue', conn, if_exists='replace')
-    print("DataFrames saved successfully!")
-finally:
-    # Close the connection
-    conn.close()
+if __name__ == "__main__":
+    main()

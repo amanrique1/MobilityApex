@@ -7,6 +7,15 @@ services:
       - shared_data:/shared_data
     command: python DataCleaningSetUp.py
 
+  data_cleaning_test:
+    build:
+      context: ./data_cleaning
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./data_cleaning:/app
+      - shared_data:/shared_data
+    command: pytest tests/ -v
+
   backend:
     build:
       context: ./backend
